@@ -362,7 +362,6 @@ class cpu
 			else
 			{
 				getline(fin,s);
-				cout<<"IN CH1....reading from file\nRead value : "<<s<<endl;
 				if(s.find("$AMJ")!=-1)
 				{
 					//reset the memory
@@ -381,7 +380,6 @@ class cpu
 				}
 				else if(flag==1 || flag==2)
 				{
-					cout<<"Pushing data in IFQ"<<endl;
 					//load the program card as soon as it comes
 					super.fill_ibq(s);
 					super.dec_ebc();
@@ -391,18 +389,15 @@ class cpu
 		}
 		void IR3()
 		{
-			cout<<"IN CH3\n";
 			string temp;
 			if(flag==4)
 			{
-				cout<<"EOF found...Memory printing\n";
 				m_obj.print_mem();
 				exit(0);
 			}
 			if(super.get_ebc()!=10)
 			{
 				temp=super.get_cards_from_ib();
-				cout<<"Found data in IFQ....Data is "<<temp<<endl;
 				super.inc_ebc();
 				drum_obj.set_drum(temp);
 				if(flag==1)
@@ -410,7 +405,6 @@ class cpu
 			}
 			else if(flag==3)
 			{
-				cout<<"Moving from drum to memory\n";
 				//int lim_cnt=drum_obj.get_curr();
 				for(int i=0;i<program_card_cnt;i++)
 				{
@@ -777,8 +771,8 @@ int main()
 	//open two files one input and one output
 	//create memory and cpu object
 
-	fin.open("job1.txt");
-	fout.open("job2_Output2.txt");
+	fin.open("input.txt");
+	fout.open("output.txt");
 	string s,s1;
 	int mem_cnt=0;
 	m_obj.reset();
