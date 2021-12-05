@@ -255,7 +255,7 @@ class cpu {
 				
 				int pos = address_tranlation(s_to_i(operand));
 				
-				TLC++;
+				// TLC++;
 				
 				if(TLC > TTL) {
 					TI = 2;
@@ -271,7 +271,7 @@ class cpu {
 					if(!(opreator.compare("LR"))) {
 						// set the contents of the register R from the given location of memory specified in the operand
 						// cout<<"LR";
-						// TLC += 1;
+						TLC += 1;
 
 						if(pos == -1) {
 							run_mos = true;
@@ -281,7 +281,7 @@ class cpu {
 					} else if (!(opreator.compare("SR"))) {
 						// get the contents of register R
 						// store them at the location of memory specified in the operand
-						// TLC += 2;
+						TLC += 2;
 						
 						fetched_R = get_R();
 						
@@ -297,7 +297,7 @@ class cpu {
 						// compare with given memory location
 						// if the values of above two matches then set toggle register to true
 						// else set the toggle register to false
-						// TLC += 1;
+						TLC += 1;
 
 						fetched_R = get_R();
 						if(pos == -1) {
@@ -314,7 +314,7 @@ class cpu {
 					} else if (!(opreator.compare("BT"))) {
 						// if the value of toggle register is true 
 						// we change the value of ic
-						// TLC += 1;
+						TLC += 1;
 
 						fetched_C = get_C();
 						
@@ -325,13 +325,13 @@ class cpu {
 							set_IC(s_to_i(operand) + 2);
 						}
 					} else if (!(opreator.compare("GD"))){
-						// TLC += 2;
+						TLC += 2;
 						
 						SI = 1;
 						
 						run_mos = true;
 					} else if (!(opreator.compare("PD"))){
-						// TLC += 1;
+						TLC += 1;
 
 						if(pos==-1)
 							PI = 3;
@@ -340,7 +340,7 @@ class cpu {
 						
 						run_mos = true;
 					} else if (!(opreator.compare("Hr"))){
-						// TLC += 1;
+						TLC += 1;
 
 						fetched_IR = "H";
 						SI = 3;
@@ -435,8 +435,8 @@ class cpu {
 					fout << ans << endl;
 					
 					if(TI==2) {
-						terminate=true;
-						terminate_code=3;
+						terminate = true;
+						terminate_code = 3;
 					}
 				}
 
@@ -444,26 +444,26 @@ class cpu {
 			} else if((TI==0 || TI==2) && SI==3) {
 				//make terminate true to end the program
 				//as we encountered the halt instruction 
-				terminate=true;
-				terminate_code=0;
+				terminate = true;
+				terminate_code = 0;
 			} else if(TI==0 && PI==1) {
-				terminate_code=4;
-				terminate=true;
+				terminate_code = 4;
+				terminate = true;
 			} else if(TI==0 && PI==2) {
-				terminate_code=5;
-				terminate=true;
+				terminate_code = 5;
+				terminate = true;
 			} else if(TI==0 && PI==3) {
-				terminate_code=6;
-				terminate=true;
+				terminate_code = 6;
+				terminate = true;
 			} else if(TI==2 && PI==1) {
-				terminate_code=7;
-				terminate=true;
+				terminate_code = 7;
+				terminate = true;
 			} else if(TI==2 && PI==2) {
-				terminate_code=8;
-				terminate=true;
+				terminate_code = 8;
+				terminate = true;
 			} else if(TI==2 && PI==3) {
-				terminate_code=3;
-				terminate=true;
+				terminate_code = 3;
+				terminate = true;
 			}
 			
 			if(terminate) {
@@ -483,6 +483,10 @@ class cpu {
 					case 5: fout << "OPERAND ERROR\n";
 					        break;
 					case 6: fout << "INVALID PAGE FAULT ERROR\n";
+					        break;
+					case 7: fout << "TIME LIMIT EXCEEDED with OPERATION CODE ERROR\n";
+					        break;
+					case 8: fout << "TIME LIMIT EXCEEDED with OPERAND ERROR\n";
 					        break;
 				}
 				
