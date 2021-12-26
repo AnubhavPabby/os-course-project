@@ -1,764 +1,1002 @@
-#include<sstream>
-#include<iostream>
-#include<string.h>
-#include<string>
-#include<fstream>
-#include<string>
-#include<cstdlib>
-#include<vector>
-#include<queue>
+#include <iostream>
+#include <cstring>
+#include <fstream>
+#include<time.h>
+#include <unistd.h>
+#include<bits/stdc++.h>
+#define TIME_QUANTUM 10
+#define N 40
+#define SIZE 300
+#define K 4
 using namespace std;
+enum TASK{
+    IS , OS , LD , RT , WT 
+};
+enum STATUS{
+    Loading , Loaded , Ready , Execute , Terminate , Read , Write
+};
+class PCB{
+    public:
+    int ID;
+    int TTL; //total time limit
+    int TLL; //total line limit 
+    int TTC; //total time conuter
+    int LLC; //line limit counter
+    int TSC; // Time slice counter
+    char F;
+    int  P_COUNT,D_COUNT;
+    int  D , P ,O, END;
+    int flag = 0;
+    int PTR ;
+    short IC;
+    string terminateMsg ;
+    STATUS status;
+    PCB(PCB* pcb)
+    {
+        ID = pcb->ID;
+        TTL = pcb->TTL;
+        TLL = pcb->TLL;
+        TTC = pcb->TTC;
+        LLC = pcb->LLC;
+        TSC = pcb->TSC;
+        F = pcb->F;D = pcb->D;
+        P_COUNT= pcb->P_COUNT;
+        D_COUNT= pcb->D_COUNT;
+        P = pcb->P , END = pcb->END;O = pcb->O;
+        status = pcb->status;
+        PTR = pcb->PTR;IC = pcb->IC;
+        terminateMsg = pcb->terminateMsg;
+    }
+    PCB()
+    {
+        TTL = TLL = TTC = LLC = TSC  = D = P_COUNT = D_COUNT = P = END= IC =O= ID = 0;
+        F = 'P';
+        PTR = -1;
+        terminateMsg = ' ';
+        status = STATUS::Loading;
+    }
+};
 
-ifstream fin;
-ofstream fout;
-int SI,PI,TI;
-bool occupied_pages[30];
-int IOI,ch[4] = {0, 5, 5, 2};
+class CH{
+    public:
+    int flag;
+    int value;
+    int time;
+    int total_time;
+    CH()
+    {
+        flag = 0 ; value = 0 ; time =  0; total_time=0;
+    }
+};
+typedef struct buffer{
+    int status ; // 0 - empty , 1 - ibq , 2-obq
+    char value[40];
+    void initalize(){
+        for(int i =  0 ; i<40 ; i++)
+        {
+            
+            value[i] = ' ';
+        }
+    }
+}Buffer;
 
-class PCB {	
-	private:
-		int TLL, TTL, LLC, TLC, page_table_ptr, terminate_code;
-		string p_id;
-	
-	public:
-		void initialize_PCB(string limits) {
-			p_id = limits.substr(0,4);
-			
-			TTL = s_to_i(limits.substr(4,2)) * 100 + s_to_i(limits.substr(6,2));
-			
-			TLL = s_to_i(limits.substr(8,2)) * 100 + s_to_i(limits.substr(10,2));
-			
-			LLC = 0;
-			TLC = 0;
-			terminate_code = 0;
-		}
-		
-		int s_to_i(string operand) {
-			// return the integer no for the given string
-			if(operand[0]>='0' && operand[0]<='9' && operand[1]>='0' && operand[1]<='9')
-				return ((int)operand[0] - 48) * 10 + ((int)operand[1] - 48);
-			
-			return -1;
-		}
+class MOS{
+    private:
+    char MainMemory[SIZE][K],DrumMemory[SIZE+200][K], SS[SIZE+1000][K], IR[K], R[K];
+    int drum = 0,memory=0;
+    short RA ;
+    bool C;//toggle
+    int SI = 0 , PI = 0 , TI = 0 ,IR1=0,IR2=0,IR3=0,IOI = 0;
+    CH* ch = new CH[3];
+    int count = 0;
+    ifstream fi;
+    ofstream fo;
+    bool mark[30] ;
+    int eof = 0;
+    TASK task = TASK::IS;
+    int flag = 0 ;
+    queue<Buffer*> emptyQ,inputfulBufferQ,outputfulBufferQ ;
+    queue<PCB*> readyQ,loadQ,inputOutputQ,terminateQ, pendingQ;
 
-		int get_page_table_ptr() {
-			return page_table_ptr;
-		}
+    
+    void read();
+    void write();
+    void terminate(int,int);
+    int cardReader();
+    void startExecution();
+    void LR();
+    void SR();
+    void CR();
+    void BT(PCB*);
+    void IRI1();
+    void IRI2();
+    void IRI3();
+    void masterMode();
+    void store_bufferDrum(Buffer*);
+    void store_buffer_DrumMM(PCB*);
+    bool check_operand(char , char);
+    void simulation();
+    void startCH(int);
+    void loadDrumMM(PCB*);
+    void Map(PCB*,int);
+    void execute();
+    void round_robin();
+    bool mainMeomoryAvailable();
+    void drum_to_OutputBuffer(PCB*);
 
-		int set_page_table_ptr(int ptr) {
-			page_table_ptr=ptr;
-		}
-		
-		void increment_TLC() {
-			TLC += 1;
-		}
+    public:
+    MOS();
+    void begin();
+    void initialization();
+    void close_all();
+    int Allocate();
+    
+};
 
-		void increment_LLC() {
-			LLC += 1;
-		}
 
-		int get_TLC() {
-			return TLC;		
-		}
-
-		string get_pid() {
-			return p_id;	
-		}
-
-		int get_terminate_code() {
-			return terminate_code;
-		}
-	
-		void set_terminate_code(int t_c) {
-			terminate_code=t_c;
-		}
-
-		int get_LLC() {	
-			return LLC;
-		}
-
-		int TLC_is_greater_than_TTL() {
-			if(TLC > TTL)
-				return 1;
-			else
-				return 0;
-		}
-
-		int LLC_is_greater_than_TLL() {
-			if(LLC > TLL)
-				return 1;
-			else
-				return 0;
-		}
-} process;
-
-class memory {
-	private:
-		char mem[300][4];
-		char ch;
-		int page_table_ptr;
-			
-	public:
-		void reset() {
-			// reset the memory by replacing every symbol in 2D array by $
-			memset(mem, '$', sizeof(char) * 300 * 4);
-			memset(occupied_pages, false, sizeof(bool) * 30);
-			
-			page_table_ptr = process.get_page_table_ptr();
-			page_table_ptr = rand() % 30;
-			
-			occupied_pages[page_table_ptr] = true;
-			
-			page_table_ptr *= 10;
-			
-			process.set_page_table_ptr(page_table_ptr);
-			
-			SI = 0;
-			PI = 0;
-				TI = 0;
-		}
-
-		string get_mem(int pos) {
-			string temp = "";
-			for(int i=0; i<4; i++)
-				temp += mem[pos][i];
-			
-			return temp;
-		}
-
-		void set_mem(string s, int pos) { 
-			for(int i=0; i<4; i++)
-				mem[pos][i] = s[i];
-		}
-		
-		void set_page_table(int row_num,int page_no) {
-			page_table_ptr = process.get_page_table_ptr();
-			
-			ostringstream temp;
-			temp << page_no;
-
-			string table_entry;
-			if(page_no<10)
-				table_entry="$10"+temp.str();
-			else	
-				table_entry="$1"+temp.str();
-			
-			set_mem(table_entry,page_table_ptr+row_num);
-		}
-
-		int allocate_page() {
-			int page_no = rand() % 30;
-			
-			while(occupied_pages[page_no]==true)
-				page_no = rand() % 30;
-			
-			occupied_pages[page_no] = true;
-			
-			return page_no;
-		}
-
-		void store_card(string s, int mem_cnt) {
-			// extract the words and call the setmem function
-			string word = "";
-			
-			int page_no = allocate_page();
-			
-			set_page_table(mem_cnt, page_no);
-			
-			page_no *= 10;
-			for(int i=0; i<s.length(); i+=4) {
-				for(int j=0; j<4; j++) {
-					word += s[i+j];
-				}	
-
-				set_mem(word,page_no);
-				
-				page_no += 1;
-				
-				word = "";
-			}
-		}
-
-		void print_mem() {
-			for(int i=0; i<300; i++) {
-				// if(i % 10 == 0)
-					// cout<<"----------Block "<<i/10<<"----------\n";
-				
-				for(int j=0;j<4;j++) {
-					fout << mem[i][j];
-				}
-				fout << endl;
-			}
-		}
-} m_obj;
-
-class cpu {
-	private:
-		int fetched_IC, pos, flag, program_card_cnt;
-		bool terminate, fetched_C;
-		string fetched_IR, operand, opreator, fetched_R, compare_string;
-		char IR[4], R[4], IC[2];
-		bool C, run_mos;
-		string s;
-
-	public:
-	//set and reset function of all the register
-		int s_to_i(string operand)//ok
-		{
-			//return the integer no for the given string
-			if(operand[0]>='0' && operand[0]<='9' && operand[1]>='0' && operand[1]<='9')
-				return ((int)operand[0]-48)*10+((int)operand[1]-48);
-			return -1;
-		}
-		void set_IC()
-		{
-			IC[0]='0';
-			IC[1]='0';
-		}
-		void set_IC(int pos)//ok
-		{
-			IC[1]=((char)pos%10)+48;
-			pos=pos/10;
-			IC[0]=((char)pos%10)+48;
-		}
-		int get_IC()
-		{
-			int val;
-			val=((int)IC[0]-48)*10+((int)IC[1]-48);
-			return val;	
-		}	
-		void inc_IC()//ok
-		{
-			int val;
-			val=get_IC();
-			val++;
-			set_IC(val);
-		}
-
-		void set_IR(int IC)//ok
-		{
-			string returned_value="";
-			returned_value=m_obj.get_mem(IC);
-			for(int i=0;i<4;i++)
-			IR[i]=returned_value[i];
-		}
-		string get_IR()//ok
-		{
-			string ret_IR="";
-			for(int i=0;i<4;i++)
-			ret_IR+=IR[i];
-			return ret_IR;
-		}
-		void set_R(int pos)//ok
-		{
-			string returned_value="";
-			returned_value=m_obj.get_mem(pos);
-			for(int i=0;i<4;i++)
-				R[i]=returned_value[i];
-		}
-		string get_R()//ok
-		{
-			string ret_R="";
-			for(int i=0;i<4;i++)
-			{
-				ret_R+=R[i];
-			}
-			return ret_R;
-		}
-		void set_C(bool value)//ok
-		{
-			C=value;
-		}
-		bool get_C()//ok
-		{
-			return C;
-		}
-		int address_tranlation(int virtual_add)
-		{
-			//address translation logic
-			int page=process.get_page_table_ptr()+(virtual_add/10);//get the page table pointer and the virtual address tens place
-			string value_page=m_obj.get_mem(page);//get the required page from the memory
-			if(value_page[1]=='$')//check for the page fault
-			{
-				PI=3;
-				return -1;
-			}
-			value_page=value_page.substr(2,2);//reterieve the page value
-			return (s_to_i(value_page)*10+(virtual_add%10));//return the real by adding the unit place to retrieve the specific instruction in the that page
-		}
-		int address_tranlation(string op)
-		{
-			//check for operan error
-			if(s_to_i(op)==-1)
-			{
-				PI=2;
-				return -2;
-			}
-			else
-				address_tranlation(s_to_i(op));//no operand error go for tranlation logic
-		}
-		void IR1()
-		{
-			if(fin.eof())
-				flag=4;
-			else
-			{
-				getline(fin,s);
-				if(s.find("$AMJ")!=-1)
-				{
-					//reset the memory
-					process.initialize_PCB(s.substr(4,12));
-					flag=1;
-					program_card_cnt=0;
-				}
-				else if(s.find("$DTA")!=-1)
-				{	
-					flag=2;
-				}
-				else if(s.find("$END")!=-1)
-				{
-					//proceed to the next job
-					flag=3;
-				}
-				else if(flag==1 || flag==2)
-				{
-					//load the program card as soon as it comes
-					super.fill_ibq(s);
-					super.dec_ebc();
-				}
-				ch[1]=5;
-			}
-		}
-		void IR3()
-		{
-			string temp;
-			if(flag==4)
-			{
-				m_obj.print_mem();
-				exit(0);
-			}
-			if(super.get_ebc()!=10)
-			{
-				temp=super.get_cards_from_ib();
-				super.inc_ebc();
-				drum_obj.set_drum(temp);
-				if(flag==1)
-					program_card_cnt++;
-			}
-			else if(flag==3)
-			{
-				//int lim_cnt=drum_obj.get_curr();
-				for(int i=0;i<program_card_cnt;i++)
-				{
-					s=drum_obj.get_drum_entry(i);
-					m_obj.store_card(s,i);
-				}
-				program_card_cnt=0;
-			}
-			ch[3]=2;
-		}
-		void startexe()
-		{
-			//fetch decode execute cycle given below
-			set_IC(0);
-			terminate=false;
-			while(!terminate)
-			{
-				//fetch ic
-				//fetch ir form the location specified by ic
-				//get the value of operator and operand
-				run_mos=false;
-				fetched_IC=address_tranlation(get_IC()); 	
-				inc_IC();
-				set_IR(fetched_IC);
-				fetched_IR=get_IR();
-				if((fetched_IR.compare("H"))==3)
-				//handle the error of instruction single H , suppose if the user writes in the program H instead of H123
-					fetched_IR="Hrrr";
-				opreator=fetched_IR.substr(0,2);
-				operand=fetched_IR.substr(2,2);
-				pos=address_tranlation(s_to_i(operand));
-				if(address_tranlation(operand)!=-2 || !(operand.compare("rr")))
-				{
-					if(!(opreator.compare("LR")))//ok
-					{
-						//set the contents of the register R from the given location of memory specified in the operand
-						//cout<<"LR";
-						if(pos==-1)
-						{
-							run_mos=true;//if operand error runmos = true
-						}
-						else
-						{
-							set_R(pos);
-							process.increment_TLC();
-
-						}
-					}
-					else if (!(opreator.compare("SR")))//ok
-					{
-						//get the contents of register R
-						//store them at the location of memory specified in the operand
-						//cout<<"SR";
-						//process.increment_TLC();
-						fetched_R=get_R();
-						if(pos==-1)
-						{
-							run_mos=true;
-						}
-						else
-						{
-							m_obj.set_mem(fetched_R, pos);
-							process.increment_TLC();
-						}
-					}
-					else if (!(opreator.compare("CR")))//ok
-					{
-						//get the contents of register r
-						//compare with given memory location
-						//if the values of above two matches then set toggle register to true
-						//else set the toggle register to false
-						//cout<<"CR";
-						fetched_R=get_R();
-						if(pos==-1)
-						{
-							run_mos=true;
-						}
-						else
-						{
-							process.increment_TLC();
-							compare_string=m_obj.get_mem(pos);
-							if(fetched_R.compare(compare_string)==0)
-								set_C(true);
-							else
-								set_C(false);
-						}
-					}
-					else if (!(opreator.compare("BT")))//ok
-					{
-
-						//if the value of toggle register is true 
-						//we change the value of ic
-						//cout<<"BT";
-						//fetched_C=get_C();
-						if(fetched_C)
-						{	
-							fetched_C=get_C();
-							//int get_physical_add=address_tranlation();
-							set_IC(s_to_i(operand));
-						}
-						process.increment_TLC();
-					}
-					else if (!(opreator.compare("GD")))//ok
-					{
-						if(pos!=-1)
-						{
-							process.increment_TLC();
-							SI=1;
-						}
-						run_mos=true;
-					}
-					else if (!(opreator.compare("PD")))//ok
-					{
-						if(pos!=-1)
-						{
-							process.increment_TLC();
-							SI=2;
-						}
-						run_mos=true;
-					}
-					else if (!(opreator.compare("Hr")))//ok
-					{
-						process.increment_TLC();
-						fetched_IR="H";
-						SI=3;
-						run_mos=true;
-					}
-					else
-					{
-						PI=1;
-						run_mos=true;
-					}
-				}
-				else
-				{
-					run_mos=true;
-				}
-				if(process.TLC_is_greater_than_TTL())
-				{
-					TI=2;
-					run_mos=true;
-					terminate=true;
-					process.set_terminate_code(3);
-				}
-				if(run_mos)
-					MOS();
-			}
-		}
-		void MOS()
-		{
-			//acording to ti si and pi set here we will handle the interrupt
-			if(TI==0 && SI==1)
-			{
-				//get the instrution of the file in terms of 4 words 
-				//store it one by one into memory
-				//at start store the program card from memory location with unit place 0
-
-				string s;
-				pos=(pos/10)*10;
-				getline(fin,s);
-				if(s.find("$END")!=-1)// if the $END encountered before hand then out of data
-				{
-					terminate=true;
-					process.set_terminate_code(1);
-				}
-				else
-				{
-					if(!s.empty() && s[s.size()-1]=='\r')
-						s.erase(s.size()-1);
-					int len=s.length(),start=0,i;
-					string s1;
-					for(i=pos;start<len;i++)
-					{
-						if((len-start)<4)
-							s1=s.substr(start,(len-start));
-						else	
-							s1=s.substr(start,4);
-						start+=4;
-						m_obj.set_mem(s1,i);
-					}
-				}
-				SI=0;
-			}
-			else if(TI==2 && SI==1)
-			{
-				terminate=true;
-				process.set_terminate_code(3);
-			}
-			else if((TI==0 || TI==2) && SI==2)
-			{
-				process.increment_LLC();
-				if(process.LLC_is_greater_than_TLL())//lime limit exceeded
-				{
-					terminate=true;
-					process.set_terminate_code(2);
-				}
-				//put the data from memory into the file specified
-				else
-				{
-					int pos=address_tranlation(s_to_i(operand)),flag=0;
-					pos=(pos/10)*10;
-					string ans="",temp="";
-					for(int i=pos;i<pos+10;i++)
-					{
-						temp=m_obj.get_mem(i);
-						for(int j=0;j<4;j++)
-						{
-							if(temp[j]=='\0' || temp[j]=='$')
-							{
-								break;
-								flag=1;
-							}
-							ans+=temp[j];
-						}
-						if(flag)
-							break;
-					}
-					fout<<ans<<endl;
-					if(TI==2)//time limit exceeded
-					{
-						terminate=true;
-						process.set_terminate_code(3);
-					}
-				}
-				SI=0;
-			}
-			else if((TI==0 || TI==2) && SI==3)//no error has ocurred terminated the program normally
-			{
-				//make terminate true to end the program
-				//as we encountered the halt instruction 
-
-				terminate=true;
-				process.set_terminate_code(0);
-			}
-			else if(TI==0 && PI==1)//operation code error has occured
-			{
-				process.set_terminate_code(4);
-				terminate=true;
-			}
-			else if(TI==0 && PI==2)//operand code error has ocurred
-			{
-				process.set_terminate_code(5);
-				terminate=true;
-			}
-
-			else if(TI==0 && PI==3)//handle the valid page fault or terminate with invaild page faults
-			{
-				if(!(opreator.compare("GD")) || !(opreator.compare("SR")))
-				{
-					process.increment_TLC();
-					int page_no=m_obj.allocate_page();
-					m_obj.set_page_table((s_to_i(operand))/10,page_no);
-					set_IC(get_IC()-1);
-				}
-				else
-				{
-					process.set_terminate_code(6);
-					terminate=true;
-				}
-			}
-
-			else if(TI==2 && PI==1)//time limit exceeded with operation code error
-			{
-				process.set_terminate_code(7);
-				terminate=true;
-			}
-
-			else if(TI==2 && PI==2)//time limit exceeded with operand error
-			{
-				process.set_terminate_code(8);
-				terminate=true;
-			}
-			
-			else if(TI==2 && PI==3)//time limit exceeded
-			{
-				process.set_terminate_code(3);
-				terminate=true;
-			}
-			switch(IOI)
-			{
-				case 0:
-				break;
-				case 1:
-					IR1();
-				break;
-				case 2:
-				//	IR2();
-				break;
-				case 3:
-				//	IR2();
-					IR1();
-				break;
-				case 4:
-					IR3();
-				break;
-				case 5:
-					IR3();
-					IR1();
-				break;
-				case 6:
-					IR3();
-					//IR2();
-				break;
-				case 7:
-					IR3();
-					//IR2();
-					IR1();
-
-				break;
-			}
-			IOI=0;
-			if(terminate)
-			{
-				fout<<process.get_pid()<<" ";
-				switch(process.get_terminate_code())
-				{
-					case 0:fout<<"NO ERROR\n";
-					       break;
-					case 1:fout<<"OUT OF DATA\n";
-					       break;
-					case 2:fout<<"LINE LIMIT EXCEEDED\n";
-					       break;
-					case 3:fout<<"TIME LIMIT EXCEEDED\n";
-					       break;
-					case 4:fout<<"OPERATION CODE ERROR\n";
-					       break;
-					case 5:fout<<"OPERAND ERROR\n";
-					       break;
-					case 6:fout<<"INVALID PAGE FAULT\n";
-					       break;
-					case 7:fout<<"TIME LIMIT EXCEEDED with OPERATION CODE ERROR\n";
-					       break;
-					case 8:fout<<"TIME LIMIT EXCEEDED with OPERAND ERROR\n";
-					       break;
-				}
-				fout<<get_IC()<<" "<<fetched_IR<<" "<<process.get_TLC()<<" "<<process.get_LLC()<<endl; 
-				fout<<endl<<endl;
-			}
-		}
-}exe;
-
-void simulation()
+int main()
 {
-	// process.increment_TLC();
-	// if(process.TLC_is_greater_than_TTL())
-	// 	TI=2;
-	/////////////////////////////
-	for(int i=1;i<4;i++)
-	{
-		if(ch[i]!=0)
-			ch[i]--;
-		else
-		{
-			IOI+=i;
-			if(i==3)
-				IOI+=1;
-		}
-	}
+    srand(time(0));
+    MOS my_os ;
+    my_os.begin();
+    my_os.close_all();
+    return 0;
+}
+void MOS::round_robin()
+{
+    if(readyQ.empty())
+        return;
+    PCB* temp = readyQ.front();
+    readyQ.pop();
+    readyQ.push(temp);
+
+}
+bool MOS::mainMeomoryAvailable(){
+    for(int i =  0 ; i<30 ; i++)
+    {
+        if(!mark[i])
+            return true;
+    }
+    return false;
+}
+void MOS::begin(){
+    int tmr=0;
+    cout<<"----------Starting Operating System----------\n\n";
+    initialization();
+    IOI = 1;
+    do
+    {
+        cout<<"Global Timer: "<<tmr<<endl;
+        execute();
+        simulation();
+        masterMode();
+        round_robin();
+        tmr++;
+        
+    }while(eof!=1 ||!inputfulBufferQ.empty() || !outputfulBufferQ.empty() || !loadQ.empty() || !readyQ.empty() || !inputOutputQ.empty() || !terminateQ.empty() );
+}
+
+void MOS::initialization(){
+    
+    memory = 0;
+    //initialize MainMemory
+    for(int i = 0 ; i<SIZE ; i++)
+        for(int j = 0 ; j<K; j++)
+            MainMemory[i][j] = ' ';
+    
+    for(int i =  0 ; i<30 ; i++)
+        mark[i] = false;
+
+    for(int i =  0 ; i<K ; i++)
+        R[i] = ' ';
+    
+    //initialize ebq
+    for(int i =  0 ; i<10;i++)
+    {
+        Buffer* temp = new Buffer;
+        temp->initalize();
+        temp->status = 0;//empty
+        emptyQ.push(temp);
+    }
+    //initalized drum
+    for(int i =  0 ; i<50;i++)
+    {
+        for(int j =  0 ; j<K;j++)
+        {
+            DrumMemory[i][j] = ' ';
+        }
+    }
+    ch[0].value = 1;ch[1].value = 2;ch[2].value=4;
+    ch[0].total_time = 5;ch[1].total_time = 5;ch[2].total_time=2;
+    
+}
+int MOS::Allocate()
+{
+    
+    int random = rand() % 30;
+    while(mark[random])
+    {
+        random = rand() % 30;
+    }
+    mark[ random ] = true;
+    return random;
+}
+bool MOS::check_operand(char a , char b)
+{
+    if(!( ( (a<='9'&&a>='0') || a==' ') && ( (b<='9'&&b>='0')|| b==' ') )){
+        PI = 2;
+        return false;
+    }
+    return true;
+}
+void MOS::Map(PCB* temp , int VA)
+{
+    int i = 0 , pte_i ;
+    int pte = temp->PTR + (int)VA/10;
+    string content;
+    for(i = 0 ;i<K;i++)
+    { 
+        content+=MainMemory[pte][i];
+    }
+    content[i]='\0';
+    if(content == "    ")
+    {
+        PI = 3;//Page Fault
+        cout<<"Page fault=> Setting PI=3 : "<<endl;
+        return;
+    }
+    pte_i = stoi(content);
+    RA = pte_i*10 + VA%10;
+}
+int MOS::cardReader(){
+    
+    int i = 0;
+    char c;
+    if(eof == 1 || emptyQ.empty())
+    {
+        cout<<"emptyQ is empty or eof = 1"<<endl;
+        return 1;
+    }
+    Buffer* temp = emptyQ.front();
+    emptyQ.pop();
+    temp->status = 1; //ibq
+    if(inputfulBufferQ.size() == 10)
+    {
+        cout<<"Input Buffer queue is full ! cant read"<<endl;
+        return 1;
+    }
+    if(fi.is_open()) {
+        int count = 0;
+        fi.get(c);
+        if(c == '\n')
+            return 0;
+        temp->value[count++] = c;
+        if(c =='H' && pendingQ.back()->F == 'P'){
+                temp->value[count++] = ' ';
+                temp->value[count++] = ' ';
+                temp->value[count++] = ' ';
+        }
+        while(fi.good()){
+            fi.get(c);
+            if(count == 40 || c =='\n'){
+                
+                if(temp->value[0] == '$')
+                {
+                    if(temp->value[1] == 'A')
+                    {
+                        
+                        PCB *temp_pcb = new PCB();
+                        temp_pcb->ID = stoi(string(1,temp->value[4])+string(1,temp->value[5])+string(1,temp->value[6])+string(1,temp->value[7]));
+                        temp_pcb->TTL = stoi(string(1,temp->value[8])+string(1,temp->value[9])+string(1,temp->value[10])+string(1,temp->value[11]));
+                        temp_pcb->TLL = stoi(string(1,temp->value[12])+string(1,temp->value[13])+string(1,temp->value[14])+string(1,temp->value[15]));
+                        temp_pcb->TTC = 0;
+                        temp_pcb->LLC = 0;
+                        temp_pcb->F = 'P';
+                        cout<<"$AMJ PCB created for job id : "<<temp_pcb->ID<<" "<<temp_pcb->F<<endl; 
+                        cout<<"PCB=> TTL:"<<temp_pcb->TTL<<" TLL:"<<temp_pcb->TLL<<" TTC:"<<temp_pcb->TTC<<" LLC:"<<temp_pcb->LLC<<endl;
+                        pendingQ.push(temp_pcb);
+              
+                    }
+                    else if(temp->value[1] == 'D'){
+                        pendingQ.back()->F = 'D';
+                        cout<<"$DTA Encountered "<<endl;   
+                    }
+                }
+                else{
+                    if(pendingQ.back()->F == 'P') //program card
+                    {            
+                        pendingQ.back()->P_COUNT +=1;              
+                        cout<<"Encountered Program card. P-cout:"<<pendingQ.back()->P_COUNT<<" ID:"<<pendingQ.back()->ID<<"\n";
+                    }
+                    else if(pendingQ.back()->F == 'D')//data card
+                    {
+                        cout<<"Encountered Data card.\n";
+                        pendingQ.back()->D_COUNT +=1;
+                    }
+                    else
+                    {
+                        cout<<"Invalid value of F"<<endl;
+                    }
+                }
+                inputfulBufferQ.push(temp);
+                if(!( (IOI >> 2) & 1))
+                {
+                    //start channel 3
+                    IOI|=4;
+                   
+                }
+              
+                task = TASK::IS;
+                return 0;
+            }
+            temp->value[count++] = c;
+            if(c =='H' && pendingQ.back()->F == 'P'){
+                temp->value[count++] = ' ';
+                temp->value[count++] = ' ';
+                temp->value[count++] = ' ';
+            }
+
+            if(fi.eof() && flag == 0)
+            {
+                inputfulBufferQ.push(temp);
+                task = TASK::IS;
+                
+                cout<<"found-------------"<<endl;
+                flag = 1;
+            }
+        
+
+        }
+    }
+    return 1;
+}
+
+void MOS::store_buffer_DrumMM(PCB* temp){
+
+    //allocate a block and update PT
+    int m = Allocate()*10;
+    int itr = temp->PTR;
+    while(MainMemory[itr][3] != ' ')
+    {
+        itr++;
+    }
+    MainMemory[itr][3] = '0'+ (m%100)/10;  
+    MainMemory[itr][2] = '0'+ (m/100);
+    MainMemory[itr][1] = '0';
+    MainMemory[itr][0] = '0';
+
+
+    for(int i = 0 ; i< 10 ; i++){
+        for(int j = 0 ; j<K ; j++){
+            MainMemory[m+i][j] = DrumMemory[temp->P+i][j];   
+        }
+    }
+    temp->P+=10;
+}
+void MOS::loadDrumMM(PCB* temp){
+    if(temp->PTR == -1)
+    {
+        temp->PTR = Allocate()*10;
+    } 
+    store_buffer_DrumMM(temp);        
+}
+void MOS::execute(){
+    if(readyQ.empty())
+    {
+        cout<<"No process in ready queue\n";
+        return;
+    }
+    PCB* temp = readyQ.front();
+    cout<<"\nExecuting Process: "<<temp->ID<<endl;
+    if(temp->status != STATUS::Execute)
+    {
+        temp->status = STATUS::Execute;
+    }
+    temp->TSC = 0;
+    while( (temp->TSC != TIME_QUANTUM) || (temp->IC != (temp->D)) )
+    {
+        temp->TSC++;
+        temp->TTC++;
+
+        //map IC to RA
+        Map(temp,temp->IC);
+        if(PI)
+        {
+            break;      
+        }
+        cout<<"Mapped IC to RA=> "<<temp->IC<<" : "<<RA<<endl;
+        //initilaize IR
+        for(int k = 0 ; k<K ; k++){
+            IR[k] = MainMemory[RA][k];
+        }
+        if(IR[0]=='H' && IR[1]==' ')
+        {
+            SI = 3;
+            break;
+        }
+        cout<<temp->TTC<<" CURRENT ttc"<<endl;
+        if(temp->TTC > temp->TTL)
+        {
+            cout<<"Total Time Limit Exceeded"<<endl;
+            TI = 2; 
+        }
+        //inc IC
+        temp->IC++;
+        if(!check_operand(IR[2],IR[3])){
+            cout<<"Operand Error"<<endl;
+            return;
+        }
+        int operand = stoi(string(1,IR[2])+string(1,IR[3]));
+        Map(temp,operand);
+        if(PI)
+        {
+            break;          
+        }
+        // cout<<"OPERAND TO RA : "<<operand<<" : "<<RA<<endl;
+        string instruction =  string(1,IR[0])+string(1, IR[1]);
+        if(instruction == "LR")
+        {
+            LR();               
+        }               
+        else if(instruction == "SR")
+        {
+            SR();            
+        }
+        else if(instruction == "CR")
+        {
+            CR();          
+        }
+        else if(instruction == "BT")
+        {
+            BT(temp);
+        }
+        else if(instruction == "GD")
+        {
+            cout<<"Setting SI=>1\n";
+            SI = 1;
+            task = TASK::RT;
+            return;
+        }
+        else if(instruction == "PD")
+        {
+            cout<<"Setting SI=>2\n";
+            SI = 2;
+            task = TASK::WT;
+            return;          
+        } 
+        else if(instruction[0] == 'H')  
+        {
+            cout<<"Setting SI=>3\n";
+            SI=3;
+            task = TASK::OS; 
+            return;            
+        }
+        else
+        {
+            PI = 1; //operation error
+            cout<<"Opcode error"<<endl;
+            return;
+        } 
+       
+    }
+    if(temp->TSC == TIME_QUANTUM)
+    {
+        TI = 1; //Time Slice Out 
+    }
+}
+
+
+void MOS::LR(){
+    for(int i = 0 ; i<K ; i++){
+        R[i] = MainMemory[RA][i];
+    }
+    
+}
+
+void MOS::SR(){
+    for(int i = 0 ; i<K ; i++){
+        MainMemory[RA][i] = R[i];
+    }
+}
+
+void MOS::CR(){
+    C = true;
+    for(int i = 0 ; i<K ; i++){
+        if (MainMemory[RA][i] != R[i]){
+            C = false;
+            return;
+        }
+    }
+}
+
+void MOS::BT(PCB* temp){
+    if(C){
+        temp->IC = (IR[2]-'0')*10+(IR[3]-'0');
+    } 
+}
+
+void MOS::drum_to_OutputBuffer(PCB* temp){
+    if(emptyQ.empty() || temp->LLC < 0)
+        return;
+    Buffer* obq ;
+    if(temp->LLC == 0)
+    {
+        fo << "Terminate msg of job id - " << temp -> ID << " is: "<< temp -> terminateMsg <<endl;
+        fo << "TTL - " << temp -> TTL << endl; 
+        fo << "TTC - " << temp -> TTC << endl; 
+        fo << "TLL - " << temp -> TLL << endl; 
+        fo << "LLC - " << temp -> LLC << endl;
+        fo << "TSC - " << temp -> TSC << endl;
+        // fo << endl << endl;
+        cout<<"All output lines done "<<temp->terminateMsg<<endl;
+        terminateQ.pop();
+        if(!emptyQ.empty())
+        {
+            obq = emptyQ.front();
+            obq->status = 2;
+            for(int i =  0 ; i<40;i++)
+            {
+                obq->value[i] = temp->terminateMsg[i];
+            }
+
+            outputfulBufferQ.push(obq);
+            emptyQ.pop();
+        }
+        if(emptyQ.size() >=3)
+        {
+                obq = emptyQ.front();
+                emptyQ.pop();
+                obq->status = 2;
+                outputfulBufferQ.push(obq);
+                obq = emptyQ.front();
+                emptyQ.pop();
+                obq->status = 2;
+                outputfulBufferQ.push(obq);
+                obq = emptyQ.front();
+                emptyQ.pop();
+                obq->status = 2;
+                outputfulBufferQ.push(obq);
+        }
+        return;
+    }
+    obq = emptyQ.front();
+    emptyQ.pop();
+    obq->status = 2;
+    int k = 0;
+    for(int i =  0 ; i<10;i++)
+    {
+        for(int j =  0 ; j<K;j++)
+        {
+            obq->value[k++] = DrumMemory[temp->O+i][j];
+            //free track
+            //DrumMemory[temp->O+i][j] = ' ';
+        }
+    }
+    outputfulBufferQ.push(obq);
+    temp->O+=10;
+    temp->LLC--;
 
 }
 
-int main() {
+void MOS::IRI1(){
+    eof = cardReader();
+    cout<<"eof: "<<eof<<endl;
+    if(eof !=1 && !emptyQ.empty())
+    {
+        startCH(0); //channel 1
+    }
+}
+void MOS::IRI2(){
+    if(outputfulBufferQ.empty())
+    return;
+    Buffer* temp = outputfulBufferQ.front();
+    outputfulBufferQ.pop();
+    temp->value[39] = '\n';
+    fo<<temp->value;
+    temp->status = 0;
+    temp->initalize();
+    emptyQ.push(temp);
+    startCH(1);
+}
+void MOS::IRI3(){
+    switch (task)
+    {
+    case TASK::IS:
+    {
+        
+        if(inputfulBufferQ.empty())
+        {
+            break;
+        }
+        if(drum<=490)
+        {
+            startCH(2);
+        }
+        else
+        {
+            cout<<"Drum Memory is full..........."<<endl;
+            //exit(0);
+        }
+        Buffer* temp = inputfulBufferQ.front();
+        inputfulBufferQ.pop();
+        cout<<"Channel 3 performs IS on : "<<temp->value<<endl;
+        if(temp->value[0] == '$')
+        {
+            cout<<"Encountered Control card: ";
+            if(temp->value[1] == 'A')
+            {
+                cout<<"$AMJ\n\nLoading new Job into Drum....!!!\n";
+                pendingQ.front()->F = 'P';
+                pendingQ.front()->P = drum;
+            }
+            else if(temp->value[1] == 'D'){
+                pendingQ.front()->F = 'D';
+                pendingQ.front()->D = drum;
+                cout<<"$DTA"<<endl;   
+            }
+            else //$END
+            {
+                pendingQ.front()->O = drum;
+                pendingQ.front()->END = drum - 10;
+                pendingQ.front()->status = STATUS::Loaded;
+                PCB* temp = new PCB(pendingQ.front());
+                loadQ.push(temp);
+                task = TASK::LD;
+                cout<<"$END"<<endl<<endl; 
+                cout<<"PCB of Job id : "<<pendingQ.front()->ID<<endl;
+                drum += (pendingQ.front()->TLL)*10; 
 
-	//open two files one input and one output
-	//create memory and cpu object
+                cout<<"\nJob added Load queue. ID:"<<pendingQ.front()->ID<<"\n";
+                pendingQ.pop();
+            }
+        }
+        else
+        {
+            store_bufferDrum(temp);
+        }
+        temp->status = 0;
+        temp->initalize();
+        emptyQ.push(temp);
+    break;
+    }
+    case TASK::LD:
+    {
+        if(loadQ.empty())
+            break;
+        PCB* temp = loadQ.front();
+        loadDrumMM(temp);
+        temp->P_COUNT--;
+        startCH(2);
+        if(temp->P_COUNT == 0)
+        {
+            temp->status = STATUS::Ready;
+            readyQ.push(temp);
+            loadQ.pop();
+        }
+    break;
+    }
+    case TASK::RT:
+    {
+        
+        if(inputOutputQ.empty())
+            break;
+        PCB* temp = inputOutputQ.front();
+        if(temp->D_COUNT == 0)
+        {
+            terminateQ.push(temp);
+            inputOutputQ.pop();
+            
+            terminate(1,-1);
 
-	fin.open("input.txt");
-	fout.open("output.txt");
-	
-	string inputJob;
-	int mem_cnt=0;
-	
-	m_obj.reset();
-	
-	while(true) {
-		simulation();
-		exe.MOS();
-		//s_m();
-	}
-	/*
-	while(!(fin.eof()))//ok
-	{
-		//get the line one byb one and check wether it contains as follows
+            break;
+        }
+        startCH(2);
+        for(int i = 0 ; i< 10 ; i++){
+            for(int j = 0 ; j<K ; j++){
+                MainMemory[RA+i][j] = DrumMemory[temp->D+i][j];
+            }
+        }
+        temp->D+=10;
+        temp->D_COUNT--;
+        temp->TSC = 0;
+        readyQ.push(temp);
+        inputOutputQ.pop();
+    break;
+    }
+    case TASK::WT:
+    {
+        if(inputOutputQ.empty())
+            break;
+        PCB* temp = inputOutputQ.front();
+        temp->LLC++;
+        if(temp->LLC > temp->TLL)
+        {
+            temp->LLC--;
+            terminateQ.push(temp);
+            inputOutputQ.pop();
+            terminate(2,-1);
+            break;
+        }
+        startCH(2);
+        for(int i = 0 ; i< 10 ; i++){
+            for(int j = 0 ; j<K ; j++){
+                DrumMemory[temp->END+10+i][j] = MainMemory[RA+i][j];
+            }
+        }
+        temp->END+=10;
+        temp->TSC = 0;
+        if(temp->status == STATUS::Terminate)
+        {
+            terminateQ.push(temp);
+            terminate(3,-1);   
+        }
+        else
+            readyQ.push(temp);
+        inputOutputQ.pop();
+    break;   
+    }
+    case TASK::OS:
+    {
+        if(terminateQ.empty())
+            break;
+        startCH(2);
+        PCB* temp = terminateQ.front();
+        drum_to_OutputBuffer(temp);
+        if(!( (IOI >> 1) & 1))
+        {
+            // IOI+=2;
+            IOI|=2;
+        }
 
-		getline(fin,s);
-		if(s.empty())
-		break;
-		if(s.find("$AMJ")!=-1)
-		{
-			//reset the memory
-			process.initialize_PCB(s.substr(4,12));
-			m_obj.reset();
-			mem_cnt=0;
-			continue;
-		}
-		else if(s.find("$DTA")!=-1)
-		{	
-			exe.startexe();
-		}
-		else if(s.find("$END")!=-1)
-		{
-			//proceed to the next job
-			mem_cnt=0;	
-			continue;
-		}
-		else 
-		{
-			//load the program card as soon as it comes
-			m_obj.store_card(s,mem_cnt++);
-		}
-	}*/
-	fin.close();
-	fout.close();
-	return 0;
+    break;   
+    }
+    default:
+    {
+        break;
+    }
+    }
+
+
+    //priority wise
+    if(!terminateQ.empty())
+    {
+        task = TASK::OS;
+    }
+    else if(!inputfulBufferQ.empty() && drum <=490)
+    {
+        task = TASK::IS;
+    }
+    else if(!loadQ.empty())
+    {
+        task = TASK::LD;
+    }
+    else if(!inputOutputQ.empty())
+    {
+        PCB* temp = inputOutputQ.front();
+        if(temp->status == STATUS::Read)
+        {
+            task = TASK::RT;
+        }
+        else
+        {
+            task = TASK::WT;
+        }
+    }
+
+}
+void MOS::masterMode(){
+    
+    if(!readyQ.empty() &&( PI || SI || TI))
+    {
+    PCB* temp = readyQ.front();
+    if(TI == 0 || TI == 1)
+    {
+        // CASE TI=0 AND PI
+        if(PI == 1)
+        {
+            terminateQ.push(temp);
+            readyQ.pop();
+            terminate(4,-1);
+        }
+        else if(PI == 2)
+        {
+            terminateQ.push(temp);
+            readyQ.pop();
+            terminate(5,-1);
+        }
+        else if(PI == 3)
+        {
+            string instruction = string(1,IR[0])+string(1, IR[1]);
+            if(instruction=="PD" || instruction=="LR" || instruction=="CR") //invalid page fault
+            {
+                terminateQ.push(temp);
+                readyQ.pop();
+                terminate(6,-1);      
+            }                     
+            else
+            {
+                //Page Fault
+                int m = Allocate()*10;
+
+                int itr = temp->PTR+stoi(string(1,IR[2])+string(1, IR[3]))/10;
+                //updated page table
+                MainMemory[itr][3] = '0'+ (m%100)/10;  
+                MainMemory[itr][2] = '0'+ (m/100);
+                MainMemory[itr][1] = '0';
+                MainMemory[itr][0] = '0';  
+                temp->IC--;
+                PI = 0;
+                return;        
+
+            }                   
+        }
+        // CASE TI=0 AND SI
+        else if(SI == 1)
+        {
+            temp->status = STATUS::Read;
+            inputOutputQ.push(temp);
+            readyQ.pop();
+            task = TASK::RT;
+            SI = 0;
+        }
+        else if(SI == 2)
+        {
+            temp->status = STATUS::Write;
+            inputOutputQ.push(temp);
+            readyQ.pop();
+            task = TASK::WT;
+            SI = 0;
+        }
+        else if(SI == 3)
+        {
+            cout<<"Job Completed Successfully\n\n";
+            terminateQ.push(temp);
+            readyQ.pop();
+            terminate(0,-1);   
+            SI = 0;
+        }   
+
+    }
+    else
+    {
+        // CASE TI=2 AND PI
+        if(PI == 1)
+        {
+            terminateQ.push(temp);
+            readyQ.pop();
+            terminate(3,4);      
+        }
+        else if(PI == 2)
+        {
+            terminateQ.push(temp);
+            readyQ.pop();
+            terminate(3,5);      
+        }        
+        else if(PI ==3)
+        {
+            terminateQ.push(temp);
+            readyQ.pop();
+            terminate(3,-1);      
+        }        
+        // CASE TI=2 AND SI
+        else if(SI == 1)
+        {
+            terminateQ.push(temp);
+            readyQ.pop();
+            terminate(3,-1);      
+        }          
+        else if(SI == 2)
+        {
+            //write
+            readyQ.pop();
+            task = TASK::WT;
+            temp->status = STATUS::Write;
+            inputOutputQ.push(temp);
+            //terminate
+            temp->status = STATUS::Terminate;
+        }
+        else if(SI == 3)
+        {
+            terminateQ.push(temp);
+            readyQ.pop();
+            terminate(0,-1);          
+        }
+
+    }  
+    }
+    
+    //IOI
+    if( (IOI >> 2) & 1)
+        IRI3();
+    if( (IOI >> 1) & 1)
+        IRI2();
+    if( (IOI >> 0) & 1)
+        IRI1();
+}
+
+void MOS::store_bufferDrum(Buffer* temp){
+    int k= 0;
+    cout<<"storing at : "<<drum<<endl; 
+    for(int i = 0 ; i< 10 ; i++){
+        for(int j = 0 ; j<K ; j++){
+            if(temp->value[k]=='\0')
+                break;
+            DrumMemory[drum+i][j] = temp->value[k++];   
+        }
+    }
+    drum+=10;
+    
+}
+
+MOS::MOS(){
+    fi.open("test.txt",ios::in); 
+    fo.open("output.txt",ios::out); 
+    memset(DrumMemory,' ', sizeof(DrumMemory));
+}
+
+void MOS::close_all(){
+    fi.close();
+    fo.close();
+}
+
+void MOS::terminate(int EM1 , int EM2){
+
+    task = TASK::OS; 
+    if(terminateQ.empty())
+        return;
+    PCB* temp = terminateQ.back();
+    temp->status = STATUS::Terminate;
+    string msg ;
+    if(EM1 == 0)
+        msg = "Terminated Succesfully";
+    else if(EM1 == 1)
+        msg="Out of Data Error";
+    else if(EM1 == 2)
+        msg="Line Limit Error";
+     else if(EM1 == 6)
+        msg="Invalid Page Fault";
+     else if(EM1 == 4)
+        msg="Operation Code Error";
+     else if(EM1 == 5)
+        msg="Operand Error";
+     else {
+        msg= "TLE Error &";
+        if(EM2 == -1)
+        msg="Time Limit Exceeded Error";
+        else if(EM2 == 4)
+            msg+=" Opcode Error";
+        else 
+            msg+=" Operand Error";      
+     }
+     temp->terminateMsg = msg;
+     cout<<"Terminate msg added to "<<temp->ID<<" msg is: "<<temp->terminateMsg<<endl;
+     PI = 0 ; SI = 0 ; TI = 0;
+} 
+
+void MOS::simulation()
+{
+    for(int i =  0 ; i<3 ; i++)
+    {
+        if(ch[i].flag)
+        {        
+            ch[i].time++;
+
+            if(ch[i].time == ch[i].total_time)
+            {
+                    cout<<"Channel "<<i<<" finisihed"<<endl;
+
+                IOI|= ch[i].value;
+                ch[i].flag = 0;
+            }
+        }
+    }
+}
+
+void MOS::startCH(int channel){
+    
+    IOI &= (7-ch[channel].value);
+    ch[channel].time = 0;
+    ch[channel].flag = 1; //busy
+    cout<<"Start Channel : "<<channel<<" IOI "<<IOI<<endl;
+
 }
